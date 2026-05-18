@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChEMBL Explorer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #1a202c; }
+
+    header {
+      background: #1a365d;
+      color: white;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header span { font-size: 0.85rem; opacity: 0.7; }
+
+    .container { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+    }
+
+    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 6px; }
+
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 180px; }
+
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input:focus, select:focus { border-color: #3182ce; }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .btn-primary { background: #3182ce; color: white; }
+    .btn-primary:hover { background: #2b6cb0; }
+    .btn-success { background: #38a169; color: white; }
+    .btn-success:hover { background: #276749; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #search-results { margin-top: 12px; }
+    .target-item {
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .target-item:hover { background: #ebf8ff; border-color: #3182ce; }
+    .target-item.selected { background: #ebf8ff; border-color: #3182ce; }
+    .target-name { font-weight: 600; font-size: 0.9rem; }
+    .target-meta { font-size: 0.78rem; color: #718096; margin-top: 2px; }
+
+    .selected-tag {
+      display: inline-block;
+      background: #ebf8ff;
+      border: 1px solid #3182ce;
+      color: #2b6cb0;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    #status { font-size: 0.85rem; color: #718096; margin-top: 8px; min-height: 18px; }
+    .error { color: #e53e3e; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { background: #edf2f7; padding: 8px 10px; text-align: left; font-weight: 600; color: #4a5568; border-bottom: 2px solid #cbd5e0; }
+    td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+    tr:hover td { background: #f7fafc; }
+
+    .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .total-badge { font-size: 0.82rem; color: #718096; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ChEMBL Explorer</h1>
+    <span>Busca e download de bioatividades</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Busca de target -->
+  <div class="card">
+    <label>Buscar Target</label>
+    <div class="row" style="margin-bottom: 10px;">
+      <input id="query" type="text" placeholder="Ex: MAP4K1, EGFR, BRAF..." />
+      <select id="activity-type" style="max-width:160px;">
+        <option value="IC50">IC50</option>
+        <option value="Ki">Ki</option>
+        <option value="Kd">Kd</option>
+        <option value="EC50">EC50</option>
+        <option value="Potency">Potency</option>
+      </select>
+      <button class="btn btn-primary" style="max-width:130px;" onclick="searchTarget()">Buscar</button>
+    </div>
+    <div id="search-results"></div>
+    <div id="selected-label"></div>
+  </div>
+
+  <!-- Ações -->
+  <div class="card" id="action-card" style="display:none;">
+    <div class="actions">
+      <button class="btn btn-primary" onclick="previewData()">Pré-visualizar (100 linhas)</button>
+      <button class="btn btn-success" id="btn-download" onclick="downloadCSV()">Baixar CSV completo</button>
+      <span class="total-badge" id="total-label"></span>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <!-- Tabela -->
+  <div class="card" id="table-card" style="display:none;">
+    <div style="overflow-x:auto;">
+      <table id="data-table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let selectedTarget = null;
+
+  async function searchTarget() {
+    const q = document.getElementById('query').value.trim();
+    if (!q) return;
+    const div = document.getElementById('search-results');
+    div.innerHTML = '<span style="color:#718096;font-size:0.85rem;">Buscando...</span>';
+    document.getElementById('selected-label').innerHTML = '';
+    document.getElementById('action-card').style.display = 'none';
+    document.getElementById('table-card').style.display = 'none';
+    selectedTarget = null;
+
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!data.length) { div.innerHTML = '<span style="color:#e53e3e;font-size:0.85rem;">Nenhum target encontrado.</span>'; return; }
+      div.innerHTML = data.map(t => `
+        <div class="target-item" onclick="selectTarget('${t.id}', '${escHtml(t.name)}')">
+          <div class="target-name">${escHtml(t.name || t.id)}</div>
+          <div class="target-meta">${t.id} &bull; ${t.type || ''} &bull; ${t.organism || ''}</div>
+        </div>
+      `).join('');
+    } catch(e) {
+      div.innerHTML = '<span class="error">Erro ao buscar. Tente novamente.</span>';
+    }
+  }
+
+  function selectTarget(id, name) {
+    selectedTarget = id;
+    document.querySelectorAll('.target-item').forEach(el => el.classList.remove('selected'));
+    event.currentTarget.classList.add('selected');
+    document.getElementById('selected-label').innerHTML = `<span class="selected-tag">Target selecionado: ${escHtml(name)} (${id})</span>`;
+    document.getElementById('action-card').style.display = 'block';
+    document.getElementById('table-card').style.display = 'none';
+    document.getElementById('status').textContent = '';
+    document.getElementById('total-label').textContent = '';
+  }
+
+  async function previewData() {
+    if (!selectedTarget) return;
+    const type = document.getElementById('activity-type').value;
+    setStatus('Carregando preview...');
+    try {
+      const res = await fetch(`/api/preview?target_id=${selectedTarget}&activity_type=${type}&limit=100`);
+      const json = await res.json();
+      const data = json.data;
+      if (!data.length) { setStatus('Nenhum dado encontrado para este filtro.', true); return; }
+      renderTable(data);
+      document.getElementById('total-label').textContent = `Mostrando ${data.length} registros`;
+      setStatus('');
+    } catch(e) {
+      setStatus('Erro ao carregar dados.', true);
+    }
+  }
+
+  function downloadCSV() {
+    if (!selectedTarget) return;
+    const type = document.getElementById('activity-type').value;
+    const url = `/api/download?target_id=${selectedTarget}&activity_type=${type}`;
+    setStatus('Iniciando download...');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedTarget}_${type}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => setStatus(''), 2000);
+  }
+
+  function renderTable(data) {
+    const keys = Object.keys(data[0]);
+    const thead = document.querySelector('#data-table thead');
+    const tbody = document.querySelector('#data-table tbody');
+    thead.innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
+    tbody.innerHTML = data.map(row =>
+      '<tr>' + keys.map(k => `<td>${row[k] ?? ''}</td>`).join('') + '</tr>'
+    ).join('');
+    document.getElementById('table-card').style.display = 'block';
+  }
+
+  function setStatus(msg, isError = false) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = isError ? 'error' : '';
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  document.getElementById('query').addEventListener('keydown', e => { if (e.key === 'Enter') searchTarget(); });
+</script>
+
+</body>
+</html>

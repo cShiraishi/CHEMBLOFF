@@ -1,0 +1,3 @@
+fastapi
+chembl-webresource-client
+pandas
