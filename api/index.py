@@ -1,15 +1,13 @@
 from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from chembl_webresource_client.new_client import new_client
+from mangum import Mangum
 import pandas as pd
 import io
 import os
 
 app = FastAPI()
-
-PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "public")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,14 +16,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def root():
-    return FileResponse(os.path.join(PUBLIC_DIR, "index.html"))
-
 ACTIVITY_FIELDS = [
     "molecule_chembl_id", "canonical_smiles", "standard_type",
     "standard_value", "standard_units", "assay_type", "pchembl_value"
 ]
+
+HTML_PATH = os.path.join(os.path.dirname(__file__), "..", "public", "index.html")
+
+@app.get("/")
+def root():
+    with open(HTML_PATH, "r") as f:
+        return HTMLResponse(content=f.read())
 
 @app.get("/api/search")
 def search_target(q: str = Query(..., min_length=2)):
@@ -54,8 +55,7 @@ def preview(
             standard_type=activity_type
         ).only(ACTIVITY_FIELDS)[:limit]
     )
-    total = len(acts)
-    return {"total_shown": total, "data": acts}
+    return {"total_shown": len(acts), "data": acts}
 
 @app.get("/api/download")
 def download(
@@ -84,3 +84,5 @@ def download(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+handler = Mangum(app)
