@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -28,12 +28,12 @@
     }
     .ticker-track {
       display: inline-block;
-      animation: ticker 60s linear infinite;
+      animation: ticker 120s linear infinite;
     }
     .ticker-track:hover { animation-play-state: paused; }
     .ticker-item {
       display: inline-block;
-      padding: 0 60px;
+      padding: 0 80px;
       font-size: 0.82rem;
       color: rgba(255,255,255,0.75);
     }
@@ -127,7 +127,7 @@
 <header>
   <div>
     <h1>ChEMBL Explorer</h1>
-    <span>Busca e download de bioatividades</span>
+    <span>Search and download bioactivity data</span>
   </div>
 </header>
 
@@ -137,11 +137,10 @@
 
 <div class="container">
 
-  <!-- Busca de target -->
   <div class="card">
-    <label>Buscar Target</label>
+    <label>Search Target</label>
     <div class="row" style="margin-bottom: 10px;">
-      <input id="query" type="text" placeholder="Ex: MAP4K1, EGFR, BRAF..." />
+      <input id="query" type="text" placeholder="e.g. MAP4K1, EGFR, BRAF..." />
       <select id="activity-type" style="max-width:160px;">
         <option value="IC50">IC50</option>
         <option value="Ki">Ki</option>
@@ -149,23 +148,21 @@
         <option value="EC50">EC50</option>
         <option value="Potency">Potency</option>
       </select>
-      <button class="btn btn-primary" style="max-width:130px;" onclick="searchTarget()">Buscar</button>
+      <button class="btn btn-primary" style="max-width:130px;" onclick="searchTarget()">Search</button>
     </div>
     <div id="search-results"></div>
     <div id="selected-label"></div>
   </div>
 
-  <!-- Ações -->
   <div class="card" id="action-card" style="display:none;">
     <div class="actions">
-      <button class="btn btn-primary" onclick="previewData()">Pré-visualizar (100 linhas)</button>
-      <button class="btn btn-success" id="btn-download" onclick="downloadCSV()">Baixar CSV completo</button>
+      <button class="btn btn-primary" onclick="previewData()">Preview (100 rows)</button>
+      <button class="btn btn-success" id="btn-download" onclick="downloadCSV()">Download full CSV</button>
       <span class="total-badge" id="total-label"></span>
     </div>
     <div id="status"></div>
   </div>
 
-  <!-- Tabela -->
   <div class="card" id="table-card" style="display:none;">
     <div style="overflow-x:auto;">
       <table id="data-table">
@@ -184,7 +181,7 @@
     const q = document.getElementById('query').value.trim();
     if (!q) return;
     const div = document.getElementById('search-results');
-    div.innerHTML = '<span style="color:#718096;font-size:0.85rem;">Buscando...</span>';
+    div.innerHTML = '<span style="color:#718096;font-size:0.85rem;">Searching...</span>';
     document.getElementById('selected-label').innerHTML = '';
     document.getElementById('action-card').style.display = 'none';
     document.getElementById('table-card').style.display = 'none';
@@ -193,7 +190,7 @@
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      if (!data.length) { div.innerHTML = '<span style="color:#e53e3e;font-size:0.85rem;">Nenhum target encontrado.</span>'; return; }
+      if (!data.length) { div.innerHTML = '<span style="color:#e53e3e;font-size:0.85rem;">No targets found.</span>'; return; }
       div.innerHTML = data.map(t => `
         <div class="target-item" onclick="selectTarget('${t.id}', '${escHtml(t.name)}')">
           <div class="target-name">${escHtml(t.name || t.id)}</div>
@@ -201,7 +198,7 @@
         </div>
       `).join('');
     } catch(e) {
-      div.innerHTML = '<span class="error">Erro ao buscar. Tente novamente.</span>';
+      div.innerHTML = '<span class="error">Search failed. Please try again.</span>';
     }
   }
 
@@ -209,7 +206,7 @@
     selectedTarget = id;
     document.querySelectorAll('.target-item').forEach(el => el.classList.remove('selected'));
     event.currentTarget.classList.add('selected');
-    document.getElementById('selected-label').innerHTML = `<span class="selected-tag">Target selecionado: ${escHtml(name)} (${id})</span>`;
+    document.getElementById('selected-label').innerHTML = `<span class="selected-tag">Selected: ${escHtml(name)} (${id})</span>`;
     document.getElementById('action-card').style.display = 'block';
     document.getElementById('table-card').style.display = 'none';
     document.getElementById('status').textContent = '';
@@ -219,17 +216,17 @@
   async function previewData() {
     if (!selectedTarget) return;
     const type = document.getElementById('activity-type').value;
-    setStatus('Carregando preview...');
+    setStatus('Loading preview...');
     try {
       const res = await fetch(`/api/preview?target_id=${selectedTarget}&activity_type=${type}&limit=100`);
       const json = await res.json();
       const data = json.data;
-      if (!data.length) { setStatus('Nenhum dado encontrado para este filtro.', true); return; }
+      if (!data.length) { setStatus('No data found for this filter.', true); return; }
       renderTable(data);
-      document.getElementById('total-label').textContent = `Mostrando ${data.length} registros`;
+      document.getElementById('total-label').textContent = `Showing ${data.length} records`;
       setStatus('');
     } catch(e) {
-      setStatus('Erro ao carregar dados.', true);
+      setStatus('Failed to load data.', true);
     }
   }
 
@@ -237,7 +234,7 @@
     if (!selectedTarget) return;
     const type = document.getElementById('activity-type').value;
     const url = `/api/download?target_id=${selectedTarget}&activity_type=${type}`;
-    setStatus('Iniciando download...');
+    setStatus('Starting download...');
     const a = document.createElement('a');
     a.href = url;
     a.download = `${selectedTarget}_${type}.csv`;
@@ -271,20 +268,20 @@
   document.getElementById('query').addEventListener('keydown', e => { if (e.key === 'Enter') searchTarget(); });
 
   const quotes = [
-    { text: "Nothing in life is to be feared, it is only to be understood.", author: "Marie Curie", prize: "Nobel Física (1903) e Química (1911)" },
-    { text: "Imagination is more important than knowledge.", author: "Albert Einstein", prize: "Nobel Física (1921)" },
-    { text: "The first principle is that you must not fool yourself — and you are the easiest person to fool.", author: "Richard Feynman", prize: "Nobel Física (1965)" },
-    { text: "Discovery consists of seeing what everybody has seen and thinking what nobody has thought.", author: "Albert Szent-Györgyi", prize: "Nobel Medicina (1937)" },
-    { text: "The best way to have a good idea is to have lots of ideas.", author: "Linus Pauling", prize: "Nobel Química (1954) e Paz (1962)" },
-    { text: "If you want to understand function, study structure.", author: "Francis Crick", prize: "Nobel Medicina (1962)" },
-    { text: "Science is the great adventure of our time.", author: "Peter Medawar", prize: "Nobel Medicina (1960)" },
-    { text: "The important thing is not to stop questioning. Curiosity has its own reason for existing.", author: "Albert Einstein", prize: "Nobel Física (1921)" },
-    { text: "In science, there are no shortcuts to truth.", author: "Karl Popper", prize: "" },
-    { text: "We are all connected; to each other biologically, to the earth chemically, to the rest of the universe atomically.", author: "Dorothy Crowfoot Hodgkin", prize: "Nobel Química (1964)" },
+    { text: "Nothing in life is to be feared, it is only to be understood.", author: "Marie Curie", prize: "Nobel Prize in Physics (1903) & Chemistry (1911)" },
+    { text: "Imagination is more important than knowledge.", author: "Albert Einstein", prize: "Nobel Prize in Physics (1921)" },
+    { text: "The first principle is that you must not fool yourself — and you are the easiest person to fool.", author: "Richard Feynman", prize: "Nobel Prize in Physics (1965)" },
+    { text: "Discovery consists of seeing what everybody has seen and thinking what nobody has thought.", author: "Albert Szent-Györgyi", prize: "Nobel Prize in Medicine (1937)" },
+    { text: "The best way to have a good idea is to have lots of ideas.", author: "Linus Pauling", prize: "Nobel Prize in Chemistry (1954) & Peace (1962)" },
+    { text: "If you want to understand function, study structure.", author: "Francis Crick", prize: "Nobel Prize in Medicine (1962)" },
+    { text: "The important thing is not to stop questioning. Curiosity has its own reason for existing.", author: "Albert Einstein", prize: "Nobel Prize in Physics (1921)" },
+    { text: "We are all connected; to each other biologically, to the earth chemically, to the rest of the universe atomically.", author: "Dorothy Crowfoot Hodgkin", prize: "Nobel Prize in Chemistry (1964)" },
+    { text: "Science is a way of thinking much more than it is a body of knowledge.", author: "Peter Medawar", prize: "Nobel Prize in Medicine (1960)" },
+    { text: "In every walk with nature, one receives far more than he seeks.", author: "Max Perutz", prize: "Nobel Prize in Chemistry (1962)" },
   ];
 
   const items = [...quotes, ...quotes].map(q =>
-    `<span class="ticker-item">"${q.text}" — <em>${q.author}${q.prize ? ', ' + q.prize : ''}</em></span>`
+    `<span class="ticker-item">"${q.text}" — <em>${q.author}, ${q.prize}</em></span>`
   ).join('');
   document.getElementById('ticker').innerHTML = items;
 </script>
